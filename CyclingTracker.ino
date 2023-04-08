@@ -76,7 +76,7 @@ void loop() {
       if(millis() - (current) >= refreshTime){
         current = millis();
         performance();
-        normalizedTime = current- pausedTime - setupTime - auxTime;
+        normalizedTime = current - (pausedTime + setupTime + auxTime);
         showClock(int(normalizedTime/1000));
         if(timer > 0 && normalizedTime >= timer * 60000){  //Convert timer in minutes to milliseconds
           finishTraining(); // If training time exceeds timer, end training
@@ -106,20 +106,20 @@ void pauseMenu(){
   unsigned long auxTimer = 0;
   String options[3] = {"Temporizador", "Continuar", "Finalizar"};
   while(option == 0){
-    selection = (encoder.read()- lastEncoder)%29;  // Module 29 to continue even if value is larger
+    selection = (encoder.read()- lastEncoder)%14;  // Module 29 to continue even if value is larger
     if(selection < 0){ //Do not allow it to go below 0
       selection = 0;
     }
     switch(selection){
-      case 0 ... 9:   //Set timer
+      case 0 ... 4:   //Set timer
         if(!digitalRead(pauseBt)){
           delay(700);
-          timer += setTimer(0, timer);     //Nuevo timer y agregar esto al timer inicial = 0 en este caso 
+          timer = setTimer(0, timer);     //Nuevo timer y agregar esto al timer inicial = 0 en este caso 
         } 
         arrow = 0;
         auxMenu = 0;
         break;
-      case 10 ... 19: //Continue
+      case 5 ... 9: //Continue
         if(!digitalRead(pauseBt)){
           delay(700);
           option = 1;
@@ -129,7 +129,7 @@ void pauseMenu(){
         if(auxMenu > byte(selection / 10)){ arrow = 0; }else{ arrow = 1;} 
         auxMenu = 1;
         break;
-      case 20 ... 29: //Finalizar
+      case 10 ... 14: //Finalizar
         if(!digitalRead(pauseBt)){
           delay(700);
           option = 1;
@@ -226,13 +226,13 @@ void userMenu(){
 void adjustMenu(){
   while(option == 0){
     lcd.clear();
-    selection = (encoder.read()- lastEncoder)%29;  // Module 29 to continue even if value is larger
+    selection = (encoder.read()- lastEncoder)%14;  // Module 29 to continue even if value is larger
     if(selection < 0){ //Do not allow it to go below 0
       selection = 0;
     }
     Serial.println(selection);
     switch(selection){
-      case 0 ... 9:
+      case 0 ... 4:
         lcd.setCursor(0,0);
         lcd.print(">Temporizador");
         lcd.setCursor(0,1);
@@ -243,7 +243,7 @@ void adjustMenu(){
           timer = setTimer(0, timer);
         }  
         break;
-      case 10 ... 19:
+      case 5 ... 9:
         lcd.setCursor(0,0);
         lcd.print("Temporizador");
         lcd.setCursor(0,1);
@@ -253,7 +253,7 @@ void adjustMenu(){
           option = 1;
           } 
         break;
-      case 20 ... 29:
+      case 10 ... 14:
         lcd.setCursor(0,0);
         lcd.print("Comenzar");
         lcd.setCursor(0,1);
@@ -273,7 +273,7 @@ int setTimer(int localTimer, unsigned int temp){
   bool state = true;
   while(state){
     Serial.println(encoder.read());
-    if(!digitalRead(pauseBt)){
+    if(!digitalRead(pauseBt) && selection >= temp){
       state = false;
       localTimer = selection;
       delay(500);
@@ -283,27 +283,17 @@ int setTimer(int localTimer, unsigned int temp){
       } else{
         selection = int(encoder.read()/2); //Reset encoder and for 2 encoder pulses +/- 1 to mins
       }
-      
-      
-    if(selection >= temp){  //Add or substract to previous selected timer if user chooses this option more than once
-      selection += temp;
-    }else{
-      selection = temp - selection;
-    }
-    if(selection < 0){ //Do not allow it to go below 0
-      selection = 0;
-      temp = 0; // No more need to consider precious timer value
-    }
+
     lcd.clear();
     lcd.setCursor(0,0);
     lcd.print("Tiempo:");
     lcd.setCursor(9,0);
     lcd.print(String(selection) + " min");
     lcd.setCursor(0,1);
-    lcd.print("Timer: " + String(timer));
+    lcd.print("Tiempo total: " + String(timer));
     delay(25);
   }
-  return localTimer;
+  return selection;
 }
 
 void showStatus(){
@@ -339,8 +329,8 @@ void finishTraining(){
     }
     if(millis() - localTimer >= ringSecs * 1000 && rings < 3*2){
       rings++;
-      localTimer = millis();
-      digitalWrite(buzzer, !digitalRead(buzzer));
+      localTimer = millis(); 
+      digitalWrite(buzzer, !digitalRead(buzzer)); //BUZZ!!
     }
     if(millis() - lastRefresh >= refreshTime){
       lcd.clear();
@@ -366,7 +356,7 @@ void finishMenu(){
         if(!digitalRead(pauseBt)){
           delay(700);
           lastEncoder = encoder.read();
-          timer += setTimer(0, timer);     //Nuevo timer y agregar esto al timer inicial
+          timer = setTimer(0, timer);     //Nuevo timer y agregar esto al timer inicial
           option = 1;
         }
         lcd.clear();
@@ -384,7 +374,7 @@ void finishMenu(){
         }
         lcd.clear();
         lcd.setCursor(0,0);
-        lcd.print("Añadir tiempo");
+        lcd.print("Anadir tiempo");
         lcd.setCursor(0,1);
         lcd.print(">Finalizar");
         break;
