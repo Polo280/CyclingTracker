@@ -4,7 +4,7 @@
 
 LiquidCrystal lcd(4, 5, 6, 7, 8, 9);
 //Variables for timer
-unsigned long current = 0;
+unsigned long current = 0, normalizedTime = 0;
 unsigned long previous = 0;   //Used to calculate speed
 unsigned long pauseTime = 0;  //Used to stop timer in display when mode=paused 
 unsigned long pausedTime = 0; //Total paused time to substract from total run time
@@ -51,7 +51,7 @@ void setup() {
   pinMode(hall, INPUT_PULLUP);
   pinMode(pauseBt, INPUT_PULLUP);
   pinMode(buzzer, OUTPUT);
-  digitalWrite(13, LOW);
+  digitalWrite(buzzer, LOW);
   attachInterrupt(digitalPinToInterrupt(hall), newRev, FALLING);
   
   lcd.setCursor(3,0);       //Show title
@@ -71,12 +71,14 @@ void loop() {
     while(!digitalRead(pauseBt));
   }
   if(runP){
+    Serial.println(encoder.read());
     if(!pause){
-      if(millis() - (current + pausedTime + setupTime) >= refreshTime){
-        current = millis() - pausedTime - setupTime - auxTime;
+      if(millis() - (current) >= refreshTime){
+        current = millis();
         performance();
-        showClock(int(current/1000));
-        if(timer > 0 && current >= timer * 60000){  //Convert timer in minutes to milliseconds
+        normalizedTime = current- pausedTime - setupTime - auxTime;
+        showClock(int(normalizedTime/1000));
+        if(timer > 0 && normalizedTime >= timer * 60000){  //Convert timer in minutes to milliseconds
           finishTraining(); // If training time exceeds timer, end training
         }
       }
@@ -162,32 +164,32 @@ void pauseMenu(){
 
 void userMenu(){
   while(user==0){
-    selection = encoder.read()%49;
+    selection = encoder.read()%24;
       if(selection < 0){ //Do not allow it to go below 0
         selection = 0;
       }
     switch(selection){
-      case 0 ... 9:
+      case 0 ... 4:
         arrow = 0; // To check if > arrow goes in row 0 or 1 of lcd
         auxUsers=0; // User 1 hovered
         if(!digitalRead(pauseBt)){user = 1;}  
         break;  
-      case 10 ... 19:
+      case 5 ... 9:
       if(auxUsers > byte(selection/10)){ arrow = 0;} else {arrow = 1;}
         auxUsers=1; // User 2 hovered
         if(!digitalRead(pauseBt)){user = 2;}
         break;
-      case 20 ... 29:
+      case 10 ... 14:
       if(auxUsers > byte(selection/10)){ arrow = 0;} else {arrow = 1;}
         auxUsers=2; // User 3 hovered
         if(!digitalRead(pauseBt)){user = 3;}  
         break;
-      case 30 ... 39:
+      case 15 ... 19:
       if(auxUsers > byte(selection/10)){ arrow = 0;} else{arrow = 1;}
         auxUsers=3; // User 4 hovered
         if(!digitalRead(pauseBt)){user = 4;}  
         break;
-      case 40 ... 49:
+      case 20 ... 24:
         arrow = 1;
         auxUsers=4; // User 5 hovered
         if(!digitalRead(pauseBt)){user = 5;}  
@@ -267,12 +269,22 @@ void adjustMenu(){
 }
 
 int setTimer(int localTimer, unsigned int temp){
-  while(localTimer == 0){
+  encoder.write(0);
+  bool state = true;
+  while(state){
+    Serial.println(encoder.read());
     if(!digitalRead(pauseBt)){
+      state = false;
       localTimer = selection;
       delay(500);
     } 
-    selection = int((encoder.read() - lastEncoder)/2); //Reset encoder and for 2 encoder pulses +/- 1 to mins
+    if(encoder.read() < 0){ 
+      encoder.write(0);
+      } else{
+        selection = int(encoder.read()/2); //Reset encoder and for 2 encoder pulses +/- 1 to mins
+      }
+      
+      
     if(selection >= temp){  //Add or substract to previous selected timer if user chooses this option more than once
       selection += temp;
     }else{
@@ -286,7 +298,7 @@ int setTimer(int localTimer, unsigned int temp){
     lcd.setCursor(0,0);
     lcd.print("Tiempo:");
     lcd.setCursor(9,0);
-    lcd.print(String(selection) + "min");
+    lcd.print(String(selection) + " min");
     lcd.setCursor(0,1);
     lcd.print("Timer: " + String(timer));
     delay(25);
@@ -353,12 +365,13 @@ void finishMenu(){
       case 0 ... 9:
         if(!digitalRead(pauseBt)){
           delay(700);
+          lastEncoder = encoder.read();
           timer += setTimer(0, timer);     //Nuevo timer y agregar esto al timer inicial
           option = 1;
         }
         lcd.clear();
         lcd.setCursor(0,0);
-        lcd.print(">Temporizador");
+        lcd.print(">Anadir tiempo");
         lcd.setCursor(0,1);
         lcd.print("Finalizar");  
         break;
@@ -371,7 +384,7 @@ void finishMenu(){
         }
         lcd.clear();
         lcd.setCursor(0,0);
-        lcd.print("Temporizador");
+        lcd.print("Añadir tiempo");
         lcd.setCursor(0,1);
         lcd.print(">Finalizar");
         break;
